@@ -2,6 +2,10 @@
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import {
+  assertSupabaseReachable,
+  getSupabaseAuthErrorMessage,
+} from "@/lib/supabase/auth-errors";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,7 +33,6 @@ export function SignUpForm({
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
@@ -40,6 +43,8 @@ export function SignUpForm({
     }
 
     try {
+      await assertSupabaseReachable();
+      const supabase = createClient();
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -50,7 +55,7 @@ export function SignUpForm({
       if (error) throw error;
       router.push("/auth/sign-up-success");
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      setError(getSupabaseAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
     }

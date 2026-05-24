@@ -5,6 +5,13 @@
 > 更新日期: 2026-02-14
 > **状态**: ✅ 核心功能已完成（90%）
 > **核心特性**: 4 种公司类型、AI 动态生成 Agent、Supabase 数据库、心跳机制、记忆系统、成本统计、极低成本
+>
+> ![1779591611951](image/README/1779591611951.png)
+>
+> ![1779591630129](image/README/1779591630129.png)
+>
+
+![1779591649280](image/README/1779591649280.png)
 
 ---
 
@@ -486,7 +493,7 @@
 
 1. **Agent 调度优化** - 修复已知问题，提升稳定性
 2. **UI/UX 完善** - 优化用户界面和交互体验
-3. **集成测试** - 端到端功能测��
+3. **集成测试** - 端到端功能测试
 4. **文档完善** - 更新部署和使用文档
 
 #### 📋 待完成
@@ -534,57 +541,234 @@
 
 ## 🚀 快速开始
 
-### 环境准备
+### 1. 准备环境
 
-```bash
-# 1. 安装依赖
-Node.js 18+
-pnpm
-Docker
+本项目是一个已经创建好的 Next.js 项目，克隆后不要再执行 `create-next-app`。
 
-# 2. 注册账号
-Supabase: https://supabase.com
-Anthropic: https://console.anthropic.com
-OpenAI: https://platform.openai.com
+需要安装：
 
-# 3. 申请 API Keys
-ANTHROPIC_API_KEY
-OPENAI_API_KEY
+- Node.js 20.9+（当前 Next.js 16 需要 Node 20.9 或更高版本）
+- pnpm
+- Supabase 项目（Auth + PostgreSQL）
+- Docker Desktop（只有使用 OpenClaw 容器或 Docker 部署时才需要）
+
+如果本机没有 pnpm，可以用 Node 自带的 Corepack 安装：
+
+```powershell
+corepack enable
+corepack prepare pnpm@latest --activate
 ```
 
-### 项目初始化
+### 2. 安装依赖
+
+```powershell
+cd G:\myaist\AICOMPANY
+pnpm install
+```
+
+macOS / Linux:
 
 ```bash
-# 1. 创建 Next.js 项目
-npx create-next-app@latest ai-company-builder --typescript --tailwind --app
+cd /path/to/AICOMPANY
+pnpm install
+```
 
-# 2. 安装核心依赖
-cd ai-company-builder
-pnpm install @supabase/supabase-js @supabase/auth-helpers-nextjs
-pnpm install drizzle-orm drizzle-kit postgres
-pnpm install @trpc/server @trpc/client @trpc/react-query @trpc/next
-pnpm install zod
-pnpm install openai anthropic
-pnpm install dockerode
+### 3. 配置环境变量
 
-# 3. 初始化 Supabase
-# 在 Supabase Dashboard 创建项目并获取 API Keys
+复制环境变量模板：
 
-# 4. 初始化 Drizzle
-npx drizzle-kit generate:pg
-npx drizzle-kit push:pg
+```powershell
+Copy-Item .env.example .env.local
+```
 
-# 4. 配置环境变量
+macOS / Linux:
+
+```bash
 cp .env.example .env.local
-# 填写 API Keys
+```
 
-# 5. 开始开发
+然后编辑 `.env.local`，至少填写这些变量：
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+DATABASE_URL=postgresql://postgres:<password>@db.<your-project-ref>.supabase.co:5432/postgres
+OPENAI_API_KEY=<your-api-key>
+OPENAI_BASE_URL=https://api.deepseek.com
+CRON_SECRET=<random-secret>
+```
+
+`NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY` 可以在 Supabase Dashboard 的 Project Settings / API 中找到。
+
+`DATABASE_URL` 可以在 Supabase Dashboard 的 Project Settings / Database 中找到。注意 `<your-project-ref>` 要和 `NEXT_PUBLIC_SUPABASE_URL` 中的项目 ref 一致。
+
+生成 `CRON_SECRET`：
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### 4. 初始化数据库
+
+第一次运行前，需要先把表结构和策略写入 Supabase。
+
+推荐方式：打开 Supabase Dashboard 的 SQL Editor，按顺序执行这些 SQL 文件：
+
+```text
+drizzle/0000_open_greymalkin.sql
+drizzle/0001_add_profile_trigger.sql
+supabase/migrations/003_enable_pgvector.sql
+supabase/migrations/004_setup_rls_policies.sql
+supabase/migrations/005_create_goals_table.sql
+```
+
+说明：
+
+- `003_enable_pgvector.sql` 用于记忆系统的向量搜索；如果你的 Supabase 项目暂时不能启用 pgvector，可以先跳过，基础页面仍可运行。
+- `supabase/migrations/001_setup_heartbeat_cron.sql` 和 `002_setup_http_extension.sql` 是生产环境心跳定时任务配置，本地开发可以先不执行。
+- `drizzle/0002_fix_agent_role_names.sql` 只用于修正旧数据里的 Agent 角色名，新库可以跳过。
+
+如果你更习惯用 Drizzle 推送 schema，也可以先把 `DATABASE_URL` 加载到当前 shell，再执行：
+
+```powershell
+$env:DATABASE_URL = (Select-String '^DATABASE_URL=' .env.local).Line.Split('=', 2)[1]
+pnpm exec drizzle-kit push
+```
+
+执行完后，仍建议补充执行：
+
+```text
+drizzle/0001_add_profile_trigger.sql
+supabase/migrations/004_setup_rls_policies.sql
+```
+
+### 5. 启动开发环境
+
+```powershell
 pnpm dev
 ```
 
-### 第一周任务
+浏览器打开：
 
-参考 `development-plan.md` 的 Week 1 详细任务列表。
+```text
+http://localhost:3000
+```
+
+常用入口：
+
+```text
+登录页: http://localhost:3000/auth/login
+注册页: http://localhost:3000/auth/sign-up
+创建公司: http://localhost:3000/company/create
+Dashboard: http://localhost:3000/dashboard
+健康检查: http://localhost:3000/api/health
+Supabase 检查: http://localhost:3000/api/health/supabase
+```
+
+修改 `.env.local` 后，需要停止并重新执行 `pnpm dev`。
+
+### 6. 生产构建和本地预览
+
+```powershell
+pnpm build
+pnpm start
+```
+
+默认访问：
+
+```text
+http://localhost:3000
+```
+
+### 7. Docker 运行
+
+Docker 运行前同样需要准备 `.env.local`。
+
+Windows:
+
+```powershell
+.\docker-start.bat
+```
+
+macOS / Linux:
+
+```bash
+chmod +x docker-start.sh
+./docker-start.sh
+```
+
+也可以直接使用 Docker Compose：
+
+```powershell
+docker compose up -d --build
+docker compose logs -f
+docker compose down
+```
+
+如果你的 Docker 版本只支持旧命令，请把 `docker compose` 换成 `docker-compose`。
+
+### 8. OpenClaw 运行时
+
+只有需要 AI Agent 在 Docker 沙盒里执行代码时，才需要构建 OpenClaw runtime：
+
+```powershell
+cd openclaw-runtime
+docker build -t openclaw-runtime:latest .
+cd ..
+```
+
+验证：
+
+```powershell
+docker run --rm openclaw-runtime:latest node --version
+docker run --rm openclaw-runtime:latest git --version
+```
+
+### 9. 测试和检查
+
+```powershell
+pnpm lint
+pnpm test
+```
+
+检查数据库连接和当前公司 / Agent 数据：
+
+```powershell
+node scripts/check-db.js
+```
+
+### 10. 常见启动问题
+
+#### TypeError: fetch failed / getaddrinfo ENOTFOUND xxx.supabase.co
+
+这通常不是 Next.js 编译错误，而是应用无法访问 Supabase 项目域名。
+
+先检查 `.env.local`：
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+DATABASE_URL=postgresql://postgres:<password>@db.<your-project-ref>.supabase.co:5432/postgres
+```
+
+确认两处 `<your-project-ref>` 完全一致，并且来自 Supabase Dashboard 的真实项目 URL。
+
+在 Windows 上可以检查 DNS：
+
+```powershell
+Resolve-DnsName <your-project-ref>.supabase.co
+Resolve-DnsName db.<your-project-ref>.supabase.co
+```
+
+如果解析失败：
+
+- 检查 Supabase 项目是否被删除、暂停，或复制错了 project ref。
+- 回到 Supabase Dashboard / Project Settings / API 重新复制 Project URL。
+- 如果项目 URL 在别的网络能访问，但当前网络不能访问，切换 DNS、代理或网络后重试。
+- 修改 `.env.local` 后重启 `pnpm dev`。
+
+当前仓库本机配置里出现过的 `amhvlqzjostrteqynijj.supabase.co` 在 DNS 下解析失败；如果你也看到这个域名，请换成你自己 Supabase 项目的真实 URL。
 
 ---
 

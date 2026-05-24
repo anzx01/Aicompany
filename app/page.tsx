@@ -1,5 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -15,14 +13,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export default async function Home() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // If user is logged in, redirect to dashboard
-  if (user) {
-    redirect("/dashboard");
-  }
-
   return (
     <main className="min-h-screen flex flex-col bg-gradient-to-b from-background via-background to-muted/20">
       {/* Navigation */}

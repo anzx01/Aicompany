@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
 
+let hasWarnedAboutSupabaseAuth = false;
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -10,6 +12,15 @@ export async function updateSession(request: NextRequest) {
   // If the env vars are not set, skip proxy check. You can remove this
   // once you setup the project.
   if (!hasEnvVars) {
+    return supabaseResponse;
+  }
+
+  const isPublicRoute =
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/auth") ||
+    request.nextUrl.pathname.startsWith("/api/health");
+
+  if (isPublicRoute) {
     return supabaseResponse;
   }
 
@@ -44,15 +55,20 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: If you remove getClaims() and you use server-side rendering
   // with the Supabase client, your users may be randomly logged out.
-  const { data } = await supabase.auth.getClaims();
+  const { data } = await supabase.auth.getClaims().catch((error) => {
+    if (process.env.NODE_ENV === "development" && !hasWarnedAboutSupabaseAuth) {
+      hasWarnedAboutSupabaseAuth = true;
+      console.warn(
+        "[Supabase] Proxy auth check failed. Check NEXT_PUBLIC_SUPABASE_URL in .env.local.",
+        error instanceof Error ? error.message : error
+      );
+    }
+
+    return { data: { claims: null } };
+  });
   const user = data?.claims;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
-  ) {
+  if (!user) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";

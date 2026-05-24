@@ -2,6 +2,10 @@
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import {
+  assertSupabaseReachable,
+  getSupabaseAuthErrorMessage,
+} from "@/lib/supabase/auth-errors";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,11 +32,12 @@ export function LoginForm({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
     try {
+      await assertSupabaseReachable();
+      const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -41,7 +46,7 @@ export function LoginForm({
       // Update this route to redirect to an authenticated route. The user already has an active session.
       router.push("/protected");
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      setError(getSupabaseAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
